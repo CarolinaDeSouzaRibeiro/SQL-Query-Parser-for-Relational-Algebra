@@ -5,7 +5,7 @@ def test(comando):
 
 
 with gr.Blocks() as demo:
-    gr.Markdown("## Ativ algebra relacional")
+    gr.Markdown("## Processador de consultas")
     with gr.Row():
         with gr.Column():
             cmd_sql = gr.Textbox(label="Comando SQL")
