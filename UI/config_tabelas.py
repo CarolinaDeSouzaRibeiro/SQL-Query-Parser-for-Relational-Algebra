@@ -3,7 +3,7 @@ import gradio as gr
 # def test(name):
 #     return f"Hello {name}"
 
-
+####OBS: Esta é uma funcionalidade extra que não necessita ser implementada
 
 #usando objeto de teste para representar as tables. TODO: ver como melhorar, e se deve utilizar POO
 tabelas = [
