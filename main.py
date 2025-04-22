@@ -27,10 +27,8 @@ with gr.Blocks() as demo:
             algeb_relac.interactive = False # desabilita edição do campo de algebra relacional
 
             gr.Markdown("## Grafos")
-            gr.Markdown("#### Não-Otimizado")
-            grafo = gr.Image(label="Grafo Não-Otimizado")
-            gr.Markdown("#### Otimizado")
-            grafo_otim = gr.Image(label="Grafo Otimizado")
+            grafo = gr.Image(label="Não-Otimizado")
+            grafo_otim = gr.Image(label="Otimizado")
 
         #comando do botao
         btn.click(funcao_btn, inputs=[cmd_sql], outputs=[algeb_relac, grafo, grafo_otim])
