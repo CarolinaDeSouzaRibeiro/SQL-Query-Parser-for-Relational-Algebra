@@ -11,7 +11,10 @@ def funcao_btn(comando):
         algebra_relacional = comando #TODO: chamar funcao de algebra relacional
 
         #GRAFOS
-        processar_consulta(algebra_relacional)#prepara grafos
+        try:
+            processar_consulta(algebra_relacional)#prepara grafos
+        except Exception as e:
+            raise gr.Error('Erro na geração do grafo.\nCertifique-se que os executáveis do Graphviz estão instalados e no seu PATH') from e
 
         return algebra_relacional, 'arvore_consulta_processada.png', 'arvore_consulta_otimizada.png'
 
