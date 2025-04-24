@@ -1,5 +1,5 @@
 import gradio as gr
-from plantando_arvores.processamento_consultas import processar_consulta
+from plantando_arvores.processamento_consultas import gerar_imagem_arvore_processada
 
 
 def funcao_btn(comando):
@@ -12,7 +12,7 @@ def funcao_btn(comando):
 
         #GRAFOS
         try:
-            processar_consulta(algebra_relacional)#prepara grafos
+            gerar_imagem_arvore_processada(algebra_relacional)#prepara grafos
         except Exception as e:
             raise gr.Error('Erro na geração do grafo.\nCertifique-se que os executáveis do Graphviz estão instalados e no seu PATH') from e
 

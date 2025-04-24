@@ -9,32 +9,12 @@ Este módulo interpreta expressões de álgebra relacional similar à acima e ge
 relacionais correspondente, visualizando-a com a biblioteca Graphviz.
 """
 
+from .arvore import NoArvore
 from graphviz import Digraph
-from typing import Optional
+from pathlib import Path
 
-class NoArvore:
-    """
-    Representa um nó na árvore de operações de álgebra relacional.
-
-    Attributes:
-        operacao (str): O operador ou conteúdo do nó (por exemplo, σ condição, π atributos, nome da tabela).
-        filhos (list[NoArvore]): Lista de filhos do nó atual.
-        id (str): Identificador único para uso no grafo visual.
-    """
-    id_counter: int = 0  # Contador estático para criar IDs únicos
-
-    def __init__(self, operacao: str) -> None:
-        self.operacao: str = operacao
-        self.filhos: list["NoArvore"] = []
-        self.id: str = f'node{NoArvore.id_counter}'
-        NoArvore.id_counter += 1
-
-    def adicionar_filho(self, filho: "NoArvore") -> None:
-        """
-        Adiciona um filho ao nó atual.
-        """
-        self.filhos.append(filho)
-
+NOME_IMAGEM: str = "arvore_consulta_processada"
+FORMATO_IMAGEM: str = "png"
 
 def quebrar_condicoes(condicao: str) -> list[str]:
     """
@@ -119,7 +99,7 @@ def processar(s: str) -> NoArvore:
     Returns:
         NoArvore: Raiz da árvore de operações.
     """
-    s = remover_parenteses_externos(s.strip())
+    s = remover_parenteses_externos(''.join(s.strip().splitlines()))
 
     if s.startswith("𝝿["):  # Projeção
         idx: int = s.index("](")
@@ -193,7 +173,7 @@ def desenhar_arvore(no: NoArvore) -> Digraph:
     return dot
 
 
-def processar_consulta(
+def gerar_imagem_arvore_processada(
     algebra_relacional: str = "𝝿[E.LNAME](𝛔[(P.PNAME='AQUARIUS')∧(P.PNUMBER=W.PNO)∧(W.ESSN=E.SSN)]((EMPLOYEE[E]⨝WORKS_ON[W])⨝PROJECT[P]))"
 ) -> None:
     """
@@ -206,10 +186,19 @@ def processar_consulta(
     """
     arvore: NoArvore = processar(algebra_relacional)
     grafico: Digraph = desenhar_arvore(arvore)
-    grafico.render('arvore_consulta_processada', format='png', cleanup=True)
+    grafico.render(NOME_IMAGEM, format=FORMATO_IMAGEM, cleanup=True)
+    raiz_do_projeto: Path = Path(__file__).parent.parent
+    caminho_imagem: Path = raiz_do_projeto / f"{NOME_IMAGEM}.{FORMATO_IMAGEM}"
+    print(f"✅ Álgebra relacional convertida para árvore de consulta com sucesso! A imagem representando-a foi salva em {caminho_imagem}")
 
 
 # Execução direta (sem necessidade de argumento externo)
 if __name__ == '__main__':
-    algebra_relacional: Optional[str] = None
-    processar_consulta(algebra_relacional) if algebra_relacional is not None else processar_consulta()
+    algebra_relacional: str = """
+𝝿[E.LNAME](
+   𝛔[(P.PNAME='AQUARIUS') ∧ (P.PNUMBER=W.PNO) ∧ (W.ESSN=E.SSN)](
+      (EMPLOYEE[E] ⨝ WORKS_ON[W]) ⨝ PROJECT[P]
+   )
+)
+"""
+    gerar_imagem_arvore_processada(algebra_relacional)
