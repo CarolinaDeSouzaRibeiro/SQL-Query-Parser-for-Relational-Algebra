@@ -7,11 +7,13 @@ def funcao_btn(comando):
     try: #TODO: substituir essa verificacao pela funcao de checagem do parser
         algebra_relacional = process_sql_query(comando)
 
-        #se a algebra relacional for vazia, dá erro
-        if not algebra_relacional:
-            raise gr.Error('Comando SQL inválido')
+        print(f'\nalgebra relacional tipo: {type(algebra_relacional)}\n\n')
+
+        #se o resultado for um erro:
+        if type(algebra_relacional) in [ValueError,KeyError]: #TODO: se certificar que todos os tipos possiveis de erro estao nessa lista
+            raise gr.Error()
     except Exception as e:
-        raise gr.Error('Comando SQL inválido')
+        raise gr.Error(f'Comando SQL inválido: {str(algebra_relacional)}')
 
     #GRAFOS
     try:
