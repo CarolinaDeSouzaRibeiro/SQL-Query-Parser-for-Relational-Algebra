@@ -1,10 +1,4 @@
 """
-𝝿[E.LNAME](
-   𝛔[(P.PNAME='AQUARIUS') ∧ (P.PNUMBER=W.PNO) ∧ (W.ESSN=E.SSN)](
-      (EMPLOYEE[E] ⨝ WORKS_ON[W]) ⨝ PROJECT[P]
-   )
-)
-
 Este módulo interpreta expressões de álgebra relacional similar à acima e gera a árvore de operações
 relacionais correspondente, visualizando-a com a biblioteca Graphviz.
 """
@@ -91,8 +85,9 @@ def remover_parenteses_externos(s: str) -> str:
 
 def processar(s: str) -> NoArvore:
     """
-    Processa recursivamente a string de álgebra relacional, retornando a árvore sintática correspondente.
-
+    Processa uma string de álgebra relacional, preservando a estrutura sintática original,
+    e quebra seleções compostas (com ∧) em nós separados.
+    
     Args:
         s (str): Expressão de álgebra relacional.
 
@@ -101,54 +96,45 @@ def processar(s: str) -> NoArvore:
     """
     s = remover_parenteses_externos(''.join(s.strip().splitlines()))
 
-    if s.startswith("𝝿["):  # Projeção
-        idx: int = s.index("](")
-        proj: str = "π " + s[2:idx]
+    # Projeção ou Seleção (forma: operador[param](argumento))
+    if s.startswith("𝝿[") or s.startswith("𝛔["):
+        operador = "π" if s.startswith("𝝿[") else "σ"
+        idx = s.index("](")
+        parametro = s[2:idx]
         conteudo, _ = extrair_conteudo_parenteses(s, idx + 1)
-        no: NoArvore = NoArvore(proj)
-        no.adicionar_filho(processar(conteudo))
-        return no
+        no_sub = processar(conteudo)
 
-    elif s.startswith("𝛔["):  # Seleção
-        idx: int = s.index("](")
-        condicoes_brutas: str = s[2:idx]
-        condicoes: list[str] = quebrar_condicoes(condicoes_brutas)
-        conteudo, _ = extrair_conteudo_parenteses(s, idx + 1)
-        no_atual: NoArvore = processar(conteudo)
-        # Aplica cada condição de seleção como um nó separado, da mais interna à mais externa
-        for cond in reversed(condicoes):
-            no_cond: NoArvore = NoArvore(f"σ {cond}")
-            no_cond.adicionar_filho(no_atual)
-            no_atual = no_cond
-        return no_atual
+        # Se for seleção, divide ∧ em múltiplos nós
+        if operador == "σ":
+            condicoes = quebrar_condicoes(parametro)
+            for cond in reversed(condicoes):
+                no = NoArvore(f"σ {cond.strip()}")
+                no.adicionar_filho(no_sub)
+                no_sub = no
+            return no_sub
 
-    elif "⨝" in s or "X" in s:  # Junção natural ou produto cartesiano
-        partes: list[str] = []
-        nivel: int = 0
-        inicio: int = 0
-        i: int = 0
-        while i < len(s):
-            if s[i] == '(':
-                nivel += 1
-            elif s[i] == ')':
-                nivel -= 1
-            elif s[i:i+1] in ("⨝", "X") and nivel == 0:
-                partes.append(s[inicio:i])
-                inicio = i + 1
-            i += 1
-        partes.append(s[inicio:])
+        else:  # Projeção
+            no = NoArvore(f"{operador} {parametro}")
+            no.adicionar_filho(no_sub)
+            return no
 
-        if len(partes) < 2:
-            raise ValueError(f"Erro ao processar junção: não foi possível dividir corretamente a string: {s}")
+    # Operadores binários: ⨝ ou X (Junção natural ou produto cartesiano)
+    nivel = 0
+    for i in range(len(s)):
+        if s[i] == '(':
+            nivel += 1
+        elif s[i] == ')':
+            nivel -= 1
+        elif nivel == 0 and (s[i] == '⨝' or s[i] == 'X'):
+            esquerda = s[:i]
+            direita = s[i+1:]
+            no = NoArvore('X')
+            no.adicionar_filho(processar(esquerda.strip()))
+            no.adicionar_filho(processar(direita.strip()))
+            return no
 
-        filhos: list[NoArvore] = [processar(p) for p in partes]
-        no: NoArvore = NoArvore("X")  # Nome genérico para junção
-        for f in filhos:
-            no.adicionar_filho(f)
-        return no
-
-    else:  # Caso base: nome de uma tabela
-        return NoArvore(s)
+    # Caso base: apenas uma tabela ou subexpressão entre colchetes
+    return NoArvore(s)
 
 
 def desenhar_arvore(no: NoArvore) -> Digraph:
@@ -195,10 +181,10 @@ def gerar_imagem_arvore_processada(
 # Execução direta (sem necessidade de argumento externo)
 if __name__ == '__main__':
     algebra_relacional: str = """
-𝝿[E.LNAME](
-   𝛔[(P.PNAME='AQUARIUS') ∧ (P.PNUMBER=W.PNO) ∧ (W.ESSN=E.SSN)](
-      (EMPLOYEE[E] ⨝ WORKS_ON[W]) ⨝ PROJECT[P]
+𝝿[C.Nome, E.CEP, P.Status](
+   𝛔[(C.TipoCliente = 4) ∧ (E.UF = "SP") ∧ (C.idCliente = E.Cliente_idCliente) ∧ (C.idCliente = P.Cliente_idCliente)](
+      (Cliente[C] ⨝ Pedido[P]) ⨝ Endereco[E]
    )
-)
-"""
+)"""
+
     gerar_imagem_arvore_processada(algebra_relacional)

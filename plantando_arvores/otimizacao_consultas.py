@@ -1,135 +1,97 @@
+'''
+ETAPAS DE OTIMIZAÇÃO
+
+1 - Posicionar as operações de select o mais longe possível da raiz
+2 - Redefinir a ordem dos produtos cartesianos para que as tabela com menor quantidade de registros sejam envolvidas nos produtos cartesianos primeiro
+3 - Adicionar operações de projeção logo acima das folhas da árvore para excluir as colunas que não serão utilizadas de cada tabela
+'''
+
 from .arvore import NoArvore
-from .processamento_consultas import processar, desenhar_arvore
-from pathlib import Path
-import sqlite3
+from .processamento_consultas import desenhar_arvore, processar
 from graphviz import Digraph
 from pathlib import Path
+import re
 
-__base_dir: Path = Path(__file__).resolve().parent
-__raiz_projeto = __base_dir
-while not (__raiz_projeto / "banco_de_dados").exists() and __raiz_projeto != __raiz_projeto.parent:
-    __raiz_projeto = __raiz_projeto.parent
+NOME_IMAGEM: str = "arvore_consulta_otimizada"
+FORMATO_IMAGEM: str = "png"
 
-__caminho_db: Path = __raiz_projeto / "banco_de_dados" / "db_vendas.db"
-
-
-def obter_tabelas_env_uma_cond(cond: str) -> set[str]:
-    """
-    Extrai os aliases das tabelas utilizados numa condição.
-    Exemplo: "W.ESSN=E.SSN" → {"W", "E"}
-    """
-    import re
-    return set(re.findall(r"\b([A-Z])\.", cond))
-
-def reorganizar_selecoes(raiz: NoArvore) -> NoArvore:
-    """
-    Move seleções (σ) o mais próximo possível das tabelas às quais pertencem.
-    """
-    if raiz.operacao.startswith("σ "):
-        cond = raiz.operacao[2:].strip()
-        tabelas_usadas = obter_tabelas_env_uma_cond(cond)
-
-        # Se a condição depende de apenas uma tabela, devemos descer essa seleção
-        if len(tabelas_usadas) == 1:
-            filho = raiz.filhos[0]
-            filho_otimizado = reorganizar_selecoes(filho)
-            for i, neto in enumerate(filho_otimizado.filhos):
-                if isinstance(neto, NoArvore):
-                    neto_tabelas = coletar_tabelas(neto)
-                    if tabelas_usadas.issubset(neto_tabelas):
-                        raiz.filhos = [neto]
-                        filho_otimizado.filhos[i] = raiz
-                        return filho_otimizado
-        else:
-            # Não pode descer: depende de múltiplas tabelas
-            raiz.filhos[0] = reorganizar_selecoes(raiz.filhos[0])
-    else:
-        # Aplicar recursivamente nos filhos
-        raiz.filhos = [reorganizar_selecoes(f) for f in raiz.filhos]
-    return raiz
+def tabelas_usadas(condicao: str) -> set[str]:
+    return set(re.findall(r'\b([A-Z])\.', condicao))
 
 def coletar_tabelas(no: NoArvore) -> set[str]:
-    """
-    Retorna um conjunto com os aliases das tabelas presentes em uma subárvore.
-    """
-    if '[' in no.operacao and ']' in no.operacao:
-        try:
-            alias = no.operacao.split('[')[1].split(']')[0]
-            return {alias}
-        except IndexError:
-            return set()
+    if "[" in no.operacao and "]" in no.operacao:
+        match = re.search(r"\[(\w+)\]", no.operacao)
+        return {match.group(1)} if match else set()
     tabelas = set()
-    for f in no.filhos:
-        tabelas.update(coletar_tabelas(f))
+    for filho in no.filhos:
+        tabelas |= coletar_tabelas(filho)
     return tabelas
 
-def estimar_tamanho_subarvore(no: NoArvore, conn: sqlite3.Connection) -> int:
-    """
-    Estima o número de tuplas envolvidas em uma subárvore.
-    """
-    if '[' in no.operacao and ']' in no.operacao:
-        tabela = no.operacao.split('[')[0]
-        cursor = conn.cursor()
-        try:
-            cursor.execute(f"SELECT COUNT(*) FROM {tabela}")
-            return cursor.fetchone()[0]
-        except sqlite3.Error:
-            return 100000  # fallback alto em caso de erro
-    return sum(estimar_tamanho_subarvore(f, conn) for f in no.filhos)
+def empurrar_selecao(condicao: str, no: NoArvore) -> NoArvore:
+    tabelas_necessarias = tabelas_usadas(condicao)
+    tabelas_subarvore = coletar_tabelas(no)
 
-def ordenar_joins_por_tamanho(raiz: NoArvore, conn: sqlite3.Connection) -> NoArvore:
-    """
-    Reorganiza os filhos das operações de junção (X) com base no tamanho estimado das subárvores.
-    """
-    if raiz.operacao == "X":
-        raiz.filhos = [ordenar_joins_por_tamanho(f, conn) for f in raiz.filhos]
-        raiz.filhos.sort(key=lambda no: estimar_tamanho_subarvore(no, conn))
-    else:
-        raiz.filhos = [ordenar_joins_por_tamanho(f, conn) for f in raiz.filhos]
-    return raiz
+    if not tabelas_necessarias.issubset(tabelas_subarvore):
+        return no
+
+    if len(no.filhos) == 2:
+        esquerda, direita = no.filhos
+        esquerda_tabelas = coletar_tabelas(esquerda)
+        direita_tabelas = coletar_tabelas(direita)
+
+        if tabelas_necessarias.issubset(esquerda_tabelas):
+            no.filhos[0] = empurrar_selecao(condicao, esquerda)
+            return no
+        elif tabelas_necessarias.issubset(direita_tabelas):
+            no.filhos[1] = empurrar_selecao(condicao, direita)
+            return no
+
+    for i, filho in enumerate(no.filhos):
+        no.filhos[i] = empurrar_selecao(condicao, filho)
+
+    novo_no = NoArvore(f"σ {condicao}")
+    novo_no.adicionar_filho(no)
+    return novo_no
 
 def otimizar_arvore(raiz: NoArvore) -> NoArvore:
-    """
-    Aplica os passos de otimização na árvore de álgebra relacional.
-    """
-    conn = sqlite3.connect(__caminho_db)
-    try:
-        raiz = reorganizar_selecoes(raiz)
-        raiz = ordenar_joins_por_tamanho(raiz, conn)
-    finally:
-        conn.close()
-    return raiz
+    if not raiz.operacao.startswith("π") and not raiz.operacao.startswith("σ"):
+        return raiz
 
-def gerar_imagem_arvore_otimizada(
-    algebra_relacional: str,
-    nome_arquivo: str = "arvore_consulta_otimizada",
-    formato: str = "png"
-) -> None:
-    """
-    Processa e otimiza uma expressão de álgebra relacional, salvando a árvore visual.
+    if raiz.operacao.startswith("π"):
+        raiz.filhos[0] = otimizar_arvore(raiz.filhos[0])
+        return raiz
 
-    Args:
-        algebra_relacional (str): A expressão de álgebra relacional.
-        nome_arquivo (str): Nome do arquivo gerado (sem extensão).
-        formato (str): Formato do arquivo de imagem.
-    """
-    raiz_original = processar(algebra_relacional)
-    raiz_otimizada = otimizar_arvore(raiz_original)
+    selecoes = []
+    atual = raiz
+    while atual.operacao.startswith("σ") and len(atual.filhos) == 1:
+        cond = atual.operacao[2:].strip()
+        selecoes.append(cond)
+        atual = atual.filhos[0]
 
-    grafico_otimizado: Digraph = desenhar_arvore(raiz_otimizada)
-    grafico_otimizado.render(nome_arquivo, format=formato, cleanup=True)
+    subraiz = otimizar_arvore(atual)
 
-    caminho = Path(__file__).parent / f"{nome_arquivo}.{formato}"
-    print(f"✅ Árvore otimizada gerada com sucesso: {caminho}")
+    for cond in selecoes:
+        subraiz = empurrar_selecao(cond, subraiz)
+
+    return subraiz
 
 
-if __name__ == "__main__":
-    algebra = """
-    𝝿[E.LNAME](
-       𝛔[(P.PNAME='AQUARIUS') ∧ (P.PNUMBER=W.PNO) ∧ (W.ESSN=E.SSN)](
-          (EMPLOYEE[E] ⨝ WORKS_ON[W]) ⨝ PROJECT[P]
-       )
-    )
-    """
-    print(__caminho_db)
-    gerar_imagem_arvore_otimizada(algebra)
+def gerar_imagem_arvore_otimizada(algebra_relacional: str) -> None:
+    arvore_processada: NoArvore = processar(algebra_relacional)
+    arvore_otimizada: NoArvore = otimizar_arvore(arvore_processada)
+    grafico: Digraph = desenhar_arvore(arvore_otimizada)
+    raiz_do_projeto: Path = Path(__file__).parent.parent
+    caminho_imagem: Path = raiz_do_projeto / f"{NOME_IMAGEM}.{FORMATO_IMAGEM}"
+    caminho_imagem_sem_extensao: Path = raiz_do_projeto / f"{NOME_IMAGEM}"
+    grafico.render(caminho_imagem_sem_extensao, format=FORMATO_IMAGEM, cleanup=True)
+    print(f"✅ Árvore otimizada salva como imagem: {caminho_imagem}")
+
+if __name__ == "__main__": 
+    algebra_relacional: str = """
+𝝿[C.Nome, E.CEP, P.Status](
+   𝛔[(C.TipoCliente = 4) ∧ (E.UF = "SP") ∧ (C.idCliente = E.Cliente_idCliente) ∧ (C.idCliente = P.Cliente_idCliente)](
+      (Cliente[C] ⨝ Pedido[P]) ⨝ Endereco[E]
+   )
+)"""
+
+    gerar_imagem_arvore_otimizada(algebra_relacional)
