@@ -311,12 +311,14 @@ def process_sql_query(sql_query):
         return relational_algebra
     except ValueError as e:
         print(f"Erro: {e}")
-        return None
+        return e
+        # return None
     except Exception as e:
         print(f"Erro inesperado no processamento: {e}")
         import traceback
         traceback.print_exc()
-        return None
+        return e
+        # return None
 
 # --- Bloco Principal para Testes ---
 if __name__ == "__main__":
