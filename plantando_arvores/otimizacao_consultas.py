@@ -6,73 +6,92 @@ ETAPAS DE OTIMIZAÇÃO
 3 - Adicionar operações de projeção logo acima das folhas da árvore para excluir as colunas que não serão utilizadas de cada tabela
 '''
 
+from .arvore import NoArvore
+from .processamento_consultas import desenhar_arvore, processar
+from graphviz import Digraph
+from pathlib import Path
 import re
 
-def desotimizar_algebra(algebra_relacional: str) -> str:
-    '''Modificação da álgebra relacional para substituir joins por seleções sobre produtos cartesianos,
-    garantindo parênteses corretos nas condições.'''
+NOME_IMAGEM: str = "arvore_consulta_otimizada"
+FORMATO_IMAGEM: str = "png"
 
-    # Encontrar todas as condições de join
-    condicoes_join = re.findall(r'⨝\[(.*?)\]', algebra_relacional, flags=re.DOTALL)
-    
-    # Remover todos os ⨝[...] e substituir por ×
-    algebra_sem_joins = re.sub(r'⨝\[.*?\]', '×', algebra_relacional)
-    
-    # Pegar as condições de seleção já existentes
-    selecao_existente = re.search(r'𝛔\[(.*?)\]', algebra_sem_joins, flags=re.DOTALL)
+def tabelas_usadas(condicao: str) -> set[str]:
+    return set(re.findall(r'\b([A-Z])\.', condicao))
 
-    if selecao_existente:
-        condicao_existente = selecao_existente.group(1)
-        # Separar as condições existentes
-        condicoes_existentes = re.split(r'(?<![<>=])∧(?![<>=])', condicao_existente)
-        condicoes_existentes = [c.strip() for c in condicoes_existentes if c.strip()]
-    else:
-        condicoes_existentes = []
+def coletar_tabelas(no: NoArvore) -> set[str]:
+    if "[" in no.operacao and "]" in no.operacao:
+        match = re.search(r"\[(\w+)\]", no.operacao)
+        return {match.group(1)} if match else set()
+    tabelas = set()
+    for filho in no.filhos:
+        tabelas |= coletar_tabelas(filho)
+    return tabelas
 
-    # Condições dos joins
-    condicoes_joins = [c.strip() for c in condicoes_join if c.strip()]
-    
-    # Junta todas as condições
-    todas_condicoes = condicoes_existentes + condicoes_joins
+def empurrar_selecao(condicao: str, no: NoArvore) -> NoArvore:
+    tabelas_necessarias = tabelas_usadas(condicao)
+    tabelas_subarvore = coletar_tabelas(no)
 
-    # Adiciona parênteses só se ainda não houver
-    def garantir_parenteses(cond):
-        cond = cond.strip()
-        if not (cond.startswith('(') and cond.endswith(')')):
-            return f'({cond})'
-        return cond
+    if not tabelas_necessarias.issubset(tabelas_subarvore):
+        return no
 
-    todas_condicoes_parentesis = [garantir_parenteses(c) for c in todas_condicoes]
-    condicao_final = ' ∧ '.join(todas_condicoes_parentesis)
+    if len(no.filhos) == 2:
+        esquerda, direita = no.filhos
+        esquerda_tabelas = coletar_tabelas(esquerda)
+        direita_tabelas = coletar_tabelas(direita)
 
-    # Substitui a seleção antiga ou cria nova
-    if selecao_existente:
-        algebra_final = re.sub(r'𝛔\[.*?\]', f'𝛔[{condicao_final}]', algebra_sem_joins, flags=re.DOTALL)
-    else:
-        algebra_final = f'𝛔[{condicao_final}]({algebra_sem_joins})'
-        
-    # Remove quebras de linha e espaços desnecessários entre parênteses
-    algebra_final = re.sub(r'\s+', ' ', algebra_final)  # primeiro, reduz tudo para um espaço
-    algebra_final = re.sub(r'\(\s+', '(', algebra_final)  # tira espaço depois de (
-    algebra_final = re.sub(r'\s+\)', ')', algebra_final)  # tira espaço antes de )
-    algebra_final = re.sub(r'\[\s+', '[', algebra_final)  # tira espaço depois de [
-    algebra_final = re.sub(r'\s+\]', ']', algebra_final)  # tira espaço antes de ]
-    
-    return algebra_final
+        if tabelas_necessarias.issubset(esquerda_tabelas):
+            no.filhos[0] = empurrar_selecao(condicao, esquerda)
+            return no
+        elif tabelas_necessarias.issubset(direita_tabelas):
+            no.filhos[1] = empurrar_selecao(condicao, direita)
+            return no
 
-def otimizacao_selects(algebra_relacional: str) -> str:
-    '''Otimiza a álgebra relacional para que as operações de select ocorram o mais 
-    longe possível da raiz da árvore de consultas. Ou seja, os selects ocorrem o quanto antes logo após as 
-    tabelas das quais dependem sejam agrupadas por um produto cartesiano'''
+    for i, filho in enumerate(no.filhos):
+        no.filhos[i] = empurrar_selecao(condicao, filho)
+
+    novo_no = NoArvore(f"σ {condicao}")
+    novo_no.adicionar_filho(no)
+    return novo_no
+
+def otimizar_arvore(raiz: NoArvore) -> NoArvore:
+    if not raiz.operacao.startswith("π") and not raiz.operacao.startswith("σ"):
+        return raiz
+
+    if raiz.operacao.startswith("π"):
+        raiz.filhos[0] = otimizar_arvore(raiz.filhos[0])
+        return raiz
+
+    selecoes = []
+    atual = raiz
+    while atual.operacao.startswith("σ") and len(atual.filhos) == 1:
+        cond = atual.operacao[2:].strip()
+        selecoes.append(cond)
+        atual = atual.filhos[0]
+
+    subraiz = otimizar_arvore(atual)
+
+    for cond in selecoes:
+        subraiz = empurrar_selecao(cond, subraiz)
+
+    return subraiz
+
+
+def gerar_imagem_arvore_otimizada(algebra_relacional: str) -> None:
+    arvore_processada: NoArvore = processar(algebra_relacional)
+    arvore_otimizada: NoArvore = otimizar_arvore(arvore_processada)
+    grafico: Digraph = desenhar_arvore(arvore_otimizada)
+    raiz_do_projeto: Path = Path(__file__).parent.parent
+    caminho_imagem: Path = raiz_do_projeto / f"{NOME_IMAGEM}.{FORMATO_IMAGEM}"
+    caminho_imagem_sem_extensao: Path = raiz_do_projeto / f"{NOME_IMAGEM}"
+    grafico.render(caminho_imagem_sem_extensao, format=FORMATO_IMAGEM, cleanup=True)
+    print(f"✅ Árvore otimizada salva como imagem: {caminho_imagem}")
 
 if __name__ == "__main__": 
     algebra_relacional: str = """
 𝝿[C.Nome, E.CEP, P.Status](
-   𝛔[(C.TipoCliente = 4) ∧ (E.UF = "SP")](
-        (
-          Cliente[C] ⨝[C.idCliente = P.Cliente_idCliente] Pedido[P]
-        ) ⨝[C.idCliente = E.Cliente_idCliente] Endereco[E]
+   𝛔[(C.TipoCliente = 4) ∧ (E.UF = "SP") ∧ (C.idCliente = E.Cliente_idCliente) ∧ (C.idCliente = P.Cliente_idCliente)](
+      (Cliente[C] ⨝ Pedido[P]) ⨝ Endereco[E]
    )
 )"""
 
-    print(desotimizar_algebra(algebra_relacional))
+    gerar_imagem_arvore_otimizada(algebra_relacional)

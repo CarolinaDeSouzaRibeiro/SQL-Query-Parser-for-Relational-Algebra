@@ -4,13 +4,13 @@ from parser import process_sql_query
 
 def funcao_btn(comando):
     #CHECAGEM DA VALIDADE DO COMANDO SQL
-    try: #TODO: substituir essa verificacao pela funcao de checagem do parser
+    try:
         algebra_relacional = process_sql_query(comando)
 
         print(f'\nalgebra relacional tipo: {type(algebra_relacional)}\n\n')
 
         #se o resultado for um erro:
-        if type(algebra_relacional) in [ValueError,KeyError]: #TODO: se certificar que todos os tipos possiveis de erro estao nessa lista
+        if type(algebra_relacional) in [ValueError,KeyError]:
             raise gr.Error()
     except Exception as e:
         raise gr.Error(f'Comando SQL inválido: {str(algebra_relacional)}')
