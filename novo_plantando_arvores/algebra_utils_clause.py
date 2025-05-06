@@ -1,5 +1,5 @@
 from .arvore import NoArvore, Arvore, ArvoreDrawer
-from .parser import construir_arvore
+from .parser_algebra import construir_arvore
 import re
 
 def formatar_algebra_relacional(algebra: str) -> str:
@@ -521,15 +521,15 @@ if __name__ == "__main__":
         
     print("Parênteses balanceados em original:", verificar_parenteses(original))
     print("Parênteses balanceados em sem_juncoes:", verificar_parenteses(sem_juncoes))
-    print("Parênteses balanceados em sem_selects_aninhados:", verificar_parenteses(sem_selects_aninhados))
-    print("Parênteses balanceados em sequencial:", verificar_parenteses(sequencial))
+    print("Parênteses balanceados em sem_selects_aninhados:", verificar_parentheses(sem_selects_aninhados))
+    print("Parênteses balanceados em sequencial:", verificar_parentheses(sequencial))
     
     print("\n====== NOVA TRANSFORMAÇÃO: EMPURRAR SELECTS PARA BAIXO ======")
     
     selects_abaixo = empurrar_selects_para_baixo(sem_selects_aninhados)
     print(selects_abaixo)
     
-    print("Parênteses balanceados em selects empurrados para baixo:", verificar_parenteses(selects_abaixo))
+    print("Parênteses balanceados em selects empurrados para baixo:", verificar_parentheses(selects_abaixo))
     
     print("\n====== DESENHANDO ARVORES ======")
     

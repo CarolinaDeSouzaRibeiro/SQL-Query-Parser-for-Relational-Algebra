@@ -1,5 +1,5 @@
 from .arvore import NoArvore, Arvore, ArvoreDrawer
-from .parser import construir_arvore
+from .parser_algebra import construir_arvore
 from .algebra_utils_clause import remover_joins, formatar_algebra_relacional
 
 def gerar_imagem_arvore_processada(
