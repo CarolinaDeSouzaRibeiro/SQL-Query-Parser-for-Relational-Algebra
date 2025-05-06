@@ -5,6 +5,7 @@ def eh_operador_unario(token: str) -> bool:
 
 def eh_operador_binario(token: str) -> bool:
     return token.startswith("⨝[") or token == "X"
+    # return token.startswith(" ⨝ ") or token.startswith("⨝[") or token == "X" or token.startswith("⨝") or token.startswith("X")
 
 def extrair_subexpressao(expr: str, inicio: int) -> tuple[str, int]:
     """Extrai a subexpressão entre parênteses e retorna ela com o índice de fim."""
@@ -18,6 +19,8 @@ def extrair_subexpressao(expr: str, inicio: int) -> tuple[str, int]:
             if contador == 0:
                 break
         fim += 1
+        # if contador == 0:
+        #     break
     return expr[inicio+1:fim], fim
 
 def construir_arvore(algebra: str) -> Arvore:
