@@ -1,5 +1,6 @@
 import gradio as gr
-from plantando_arvores.processamento_consultas import gerar_imagem_arvore_processada
+# from plantando_arvores.processamento_consultas import gerar_imagem_arvore_processada
+from novo_plantando_arvores.processamento import gerar_imagem_arvore_processada
 from parser import process_sql_query
 
 def funcao_btn(comando):
