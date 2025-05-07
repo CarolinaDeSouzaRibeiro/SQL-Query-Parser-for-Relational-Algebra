@@ -128,7 +128,10 @@ def processar(s: str) -> NoArvore:
         elif nivel == 0 and (s[i] == '⨝' or s[i] == 'X'):
             esquerda = s[:i]
             direita = s[i+1:]
-            no = NoArvore(f'{s[i]}')
+            if s[i] == '⨝':
+                no = NoArvore(f'⨝')
+            else:
+                no = NoArvore(f'X')
             no.adicionar_filho(processar(esquerda.strip()))
             no.adicionar_filho(processar(direita.strip()))
             return no
@@ -148,6 +151,9 @@ def desenhar_arvore(no: NoArvore) -> Digraph:
         Digraph: Objeto Graphviz com o grafo desenhado.
     """
     dot: Digraph = Digraph()
+
+    dot.attr('graph',fontname='Cambria Math')
+    dot.attr('node',fontname='Cambria Math')
 
     def adicionar_nos(n: NoArvore) -> None:
         dot.node(n.id, n.operacao, shape="box")
