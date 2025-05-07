@@ -472,6 +472,7 @@ def inserir_selecoes_unica_tabela(no: No, selecoes: list[dict]) -> No:
 def inserir_selecoes_multiplas_tabelas(no: No, selecoes: list[dict]) -> No:
     """
     Insere seleções que envolvem múltiplas tabelas nos pontos adequados da árvore.
+    Versão melhorada que posiciona corretamente operações que envolvem múltiplas tabelas.
     
     Args:
         no (No): O nó atual sendo processado.
@@ -509,11 +510,18 @@ def inserir_selecoes_multiplas_tabelas(no: No, selecoes: list[dict]) -> No:
                 tabelas_esq = obter_tabelas_da_subarvore(no.filho_esq)
                 tabelas_dir = obter_tabelas_da_subarvore(no.filho_dir)
                 
-                # Se a seleção envolve tabelas de ambos os lados, é aplicável apenas neste nível
-                if any(t in tabelas_esq for t in selecao["tabelas"]) and any(t in tabelas_dir for t in selecao["tabelas"]):
+                # Se há tabelas de ambos os lados, a seleção deve ser aplicada neste nível
+                if (any(t in tabelas_esq for t in selecao["tabelas"]) and 
+                    any(t in tabelas_dir for t in selecao["tabelas"])):
                     selecoes_aplicaveis.append(selecao)
-                else:
+                # Se todas as tabelas estão em apenas um dos lados, a seleção não é aplicável neste nível
+                elif all(t in tabelas_esq for t in selecao["tabelas"]):
                     selecoes_nao_aplicaveis.append(selecao)
+                elif all(t in tabelas_dir for t in selecao["tabelas"]):
+                    selecoes_nao_aplicaveis.append(selecao)
+                # Se não se encaixa em nenhum dos casos acima, aplica neste nível
+                else:
+                    selecoes_aplicaveis.append(selecao)
             else:
                 selecoes_nao_aplicaveis.append(selecao)
         
@@ -548,6 +556,7 @@ def inserir_selecoes_multiplas_tabelas(no: No, selecoes: list[dict]) -> No:
 def extrair_tabelas_da_condicao(condicao: str) -> set[str]:
     """
     Extrai os nomes das tabelas envolvidas em uma condição de seleção.
+    Versão melhorada que identifica corretamente todas as tabelas.
     
     Args:
         condicao (str): A condição de seleção.
@@ -555,24 +564,13 @@ def extrair_tabelas_da_condicao(condicao: str) -> set[str]:
     Returns:
         set[str]: Conjunto de nomes de tabelas envolvidas.
     """
-    tabelas = set()
-    
-    # Normaliza a condição removendo operadores lógicos
-    condicao_normalizada = condicao.replace("∧", " ").replace(" AND ", " ").replace(" OR ", " ")
-    
-    # Procura por padrões "tabela.coluna" em cada parte da condição
-    partes = condicao_normalizada.split()
-    for parte in partes:
-        parte = parte.strip("()[],'\"")
-        if "." in parte:
-            tabela = parte.split(".")[0]
-            tabelas.add(tabela)
-    
-    return tabelas
+    colunas_por_tabela = extrair_colunas_da_condicao(condicao)
+    return set(colunas_por_tabela.keys())
 
 def coletar_selecoes(no: No, selecoes: list[dict]):
     """
     Coleta todas as seleções presentes na árvore.
+    Versão melhorada que identifica corretamente as tabelas dependentes.
     
     Args:
         no (No): O nó atual sendo visitado.
@@ -726,6 +724,7 @@ def otimizar_projecoes(arvore_nao_otimizada: Arvore) -> Arvore:
 def identificar_colunas_necessarias(no: No) -> dict[str, set[str]]:
     """
     Identifica todas as colunas necessárias para a consulta, agrupadas por tabela.
+    Versão melhorada que considera corretamente operações intermediárias.
     
     Args:
         no (No): O nó atual sendo analisado.
@@ -748,36 +747,26 @@ def identificar_colunas_necessarias(no: No) -> dict[str, set[str]]:
                 colunas[tabela].add(nome_coluna)
     
     elif no.get_operacao() == "SELECT":
-        # Extrai colunas da condição
+        # Extrai colunas da condição de seleção
         condicao = no.valor[2:-1]  # Remove "𝛔[" e "]"
-        # Divide a condição por operadores comuns
-        for op in [" = ", " > ", " < ", " >= ", " <= ", " <> ", " AND ", " OR ", "∧"]:
-            if op in condicao:
-                partes = condicao.split(op)
-                for parte in partes:
-                    parte = parte.strip()
-                    if "." in parte and not parte.startswith("'") and not parte.endswith("'"):
-                        tabela, nome_coluna = parte.split(".")
-                        if tabela not in colunas:
-                            colunas[tabela] = set()
-                        colunas[tabela].add(nome_coluna)
+        # Extrai todas as colunas mencionadas na condição
+        colunas_select = extrair_colunas_da_condicao(condicao)
+        for tabela, cols in colunas_select.items():
+            if tabela not in colunas:
+                colunas[tabela] = set()
+            colunas[tabela].update(cols)
     
     elif no.get_operacao() == "JOIN":
         # Extrai colunas da condição de join
         if "[" in no.valor and "]" in no.valor:
             condicao = no.valor[2:-1]  # Remove "⨝[" e "]"
-            for op in [" = ", " > ", " < ", " >= ", " <= ", " <> "]:
-                if op in condicao:
-                    partes = condicao.split(op)
-                    for parte in partes:
-                        parte = parte.strip()
-                        if "." in parte:
-                            tabela, nome_coluna = parte.split(".")
-                            if tabela not in colunas:
-                                colunas[tabela] = set()
-                            colunas[tabela].add(nome_coluna)
+            colunas_join = extrair_colunas_da_condicao(condicao)
+            for tabela, cols in colunas_join.items():
+                if tabela not in colunas:
+                    colunas[tabela] = set()
+                colunas[tabela].update(cols)
     
-    # Processa os filhos recursivamente
+    # Processa os filhos recursivamente e combina os resultados
     if no.filho_esq:
         colunas_filho = identificar_colunas_necessarias(no.filho_esq)
         for tabela, cols in colunas_filho.items():
@@ -794,9 +783,49 @@ def identificar_colunas_necessarias(no: No) -> dict[str, set[str]]:
     
     return colunas
 
+def extrair_colunas_da_condicao(condicao: str) -> dict[str, set[str]]:
+    """
+    Extrai todas as colunas mencionadas em uma condição.
+    
+    Args:
+        condicao (str): A condição a ser analisada.
+        
+    Returns:
+        dict[str, set[str]]: Dicionário com tabelas como chaves e conjuntos de colunas como valores.
+    """
+    colunas = {}
+    
+    # Normaliza a condição removendo operadores lógicos
+    tokens = []
+    # Lista de operadores comuns em condições
+    operadores = ["∧", "AND", "OR", "=", ">", "<", ">=", "<=", "<>"]
+    
+    # Substituir operadores por espaços para facilitar a tokenização
+    condicao_norm = condicao
+    for op in operadores:
+        condicao_norm = condicao_norm.replace(op, " ")
+    
+    # Extrai tokens potenciais
+    for token in condicao_norm.split():
+        token = token.strip("()[],'\"")
+        tokens.append(token)
+    
+    # Analisa cada token em busca de padrões "tabela.coluna"
+    for token in tokens:
+        if "." in token:
+            partes = token.split(".")
+            if len(partes) == 2:
+                tabela, coluna = partes
+                if tabela not in colunas:
+                    colunas[tabela] = set()
+                colunas[tabela].add(coluna)
+    
+    return colunas
+
 def inserir_projecoes_precoces(no: No, colunas_necessarias: dict[str, set[str]]) -> No:
     """
     Insere projeções precoces nos nós de tabela.
+    Versão melhorada que considera todas as colunas necessárias.
     
     Args:
         no (No): O nó atual sendo processado.
@@ -812,12 +841,12 @@ def inserir_projecoes_precoces(no: No, colunas_necessarias: dict[str, set[str]])
     no.filho_esq = inserir_projecoes_precoces(no.filho_esq, colunas_necessarias)
     if no.filho_esq:
         no.filho_esq.pai = no
-        no.filho_esq.nivel = no.nivel + 1  # Garante nível consistente
+        no.filho_esq.nivel = no.nivel + 1
     
     no.filho_dir = inserir_projecoes_precoces(no.filho_dir, colunas_necessarias)
     if no.filho_dir:
         no.filho_dir.pai = no
-        no.filho_dir.nivel = no.nivel + 1  # Garante nível consistente
+        no.filho_dir.nivel = no.nivel + 1
     
     # Se é uma tabela, insere uma projeção
     if no.get_operacao() == "TABLE":
@@ -839,7 +868,7 @@ def inserir_projecoes_precoces(no: No, colunas_necessarias: dict[str, set[str]])
             
             # Ajusta o pai do nó de tabela
             no.pai = projecao
-            no.nivel = projecao.nivel + 1  # Corrigido: Garante que o nível do filho seja pai + 1
+            no.nivel = projecao.nivel + 1
             
             # Conecta a projeção ao pai original
             if projecao.pai:
@@ -847,22 +876,12 @@ def inserir_projecoes_precoces(no: No, colunas_necessarias: dict[str, set[str]])
                     projecao.pai.filho_esq = projecao
                 elif projecao.pai.filho_dir == no:
                     projecao.pai.filho_dir = projecao
-                    
-            # Se estamos substituindo a raiz (sem pai), precisamos atualizá-la
-            elif no.pai is None:
-                # Quando estamos na raiz, precisamos garantir que a função que chamou
-                # esta possa identificar a nova raiz
-                if projecao.nivel != 0:
-                    projecao.nivel = 0
-                    # Atualiza o nível do filho para manter a consistência
-                    no.nivel = projecao.nivel + 1
             
-            # Retorna o novo nó (projeção) como a raiz da subárvore
             return projecao
     
     # Se não houve modificação, retorna o nó original
     return no
-    
+
 test_cases = [
     # (Somente os testes com `expected_ra`, removi os que esperam erro)
     {"description": "T1", "expected_ra": "𝝿[cliente.nome, cliente.email](cliente[cliente])"},
