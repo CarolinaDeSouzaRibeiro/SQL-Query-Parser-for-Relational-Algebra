@@ -1,6 +1,7 @@
 import gradio as gr
-from plantando_arvores.processamento_consultas import gerar_imagem_arvore_processada
-from plantando_arvores.otimizacao_consultas import gerar_imagem_arvore_otimizada
+import graphviz as gv
+from plantando_arvores.processamento_consultas import processar, gerar_imagem_arvore_processada, desenhar_arvore
+from plantando_arvores.teste_otimizador import gerar_grafo_otimizado
 # from novo_plantando_arvores.processamento import gerar_imagem_arvore_processada
 from parser import process_sql_query
 
@@ -23,7 +24,7 @@ def funcao_btn(comando):
         raise gr.Error('Erro na geração do grafo não-otimizado.\nCertifique-se que os executáveis do Graphviz estão instalados e no seu PATH') from e
     #otimizado
     try:
-        gerar_imagem_arvore_otimizada(algebra_relacional)#prepara grafos
+        gerar_grafo_otimizado(algebra_relacional)
     except Exception as e:
         raise gr.Error('Erro na geração do grafo otimizado.\nCertifique-se que os executáveis do Graphviz estão instalados e no seu PATH') from e
 
@@ -42,8 +43,15 @@ with gr.Blocks() as demo:
             algeb_relac.interactive = False # desabilita edição do campo de algebra relacional
 
             gr.Markdown("## Grafos")
-            grafo = gr.Image(label="Não-Otimizado")
-            grafo_otim = gr.Image(label="Otimizado")
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("Grafo não-otimizado")
+                    grafo = gr.Image(label="Não-Otimizado")
+                with gr.Column():
+                    gr.Markdown("Grafo otimizado")
+                    grafo_otim = gr.Image(label="Otimizado")
+            # grafo = gr.Image(label="Não-Otimizado")
+            # grafo_otim = gr.Image(label="Otimizado")
 
         #comando do botao
         btn.click(funcao_btn, inputs=[cmd_sql], outputs=[algeb_relac, grafo, grafo_otim])
