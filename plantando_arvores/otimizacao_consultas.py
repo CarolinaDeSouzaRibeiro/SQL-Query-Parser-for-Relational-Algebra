@@ -1,4 +1,6 @@
 '''
+Esse código busca otimizar um comando em algebra relacional, ao final exportando um grafico com a arvore de decisão otimizada.
+
 ETAPAS DE OTIMIZAÇÃO
 
 1 - Posicionar as operações de select o mais longe possível da raiz
@@ -16,9 +18,25 @@ NOME_IMAGEM: str = "arvore_consulta_otimizada"
 FORMATO_IMAGEM: str = "png"
 
 def tabelas_usadas(condicao: str) -> set[str]:
+    """Extrai as tabelas usadas em uma condição.
+    
+    **Parâmetros**:
+        - `condicao` (str): Condição a ser analisada.
+
+    Retorno:
+        - `set[str]`: Conjunto de tabelas usadas na condição.
+    """
     return set(re.findall(r'\b([A-Z])\.', condicao))
 
 def coletar_tabelas(no: NoArvore) -> set[str]:
+    """Coleta todas as tabelas usadas em uma subárvore.
+
+    - **Parâmetros**:
+    - `no` (NoArvore): Nó raiz da subárvore.
+
+    - **Retorno**:
+    - `set[str]`: Conjunto de tabelas usadas na subárvore.
+    """
     if "[" in no.operacao and "]" in no.operacao:
         match = re.search(r"\[(\w+)\]", no.operacao)
         return {match.group(1)} if match else set()
@@ -28,6 +46,17 @@ def coletar_tabelas(no: NoArvore) -> set[str]:
     return tabelas
 
 def empurrar_selecao(condicao: str, no: NoArvore) -> NoArvore:
+    """
+    Empurra uma operação de seleção o mais próximo possível das folhas da árvore.
+
+    - **Parâmetros**:
+        - `condicao` (str): Condição de seleção.
+        - `no` (NoArvore): Nó raiz da subárvore.
+
+    - **Retorno**:
+        - `NoArvore`: Subárvore com a seleção empurrada.
+    """
+
     tabelas_necessarias = tabelas_usadas(condicao)
     tabelas_subarvore = coletar_tabelas(no)
 
@@ -54,6 +83,16 @@ def empurrar_selecao(condicao: str, no: NoArvore) -> NoArvore:
     return novo_no
 
 def otimizar_arvore(raiz: NoArvore) -> NoArvore:
+    """
+        Otimiza a árvore de álgebra relacional aplicando técnicas de empurrar seleções e reordenar produtos cartesianos.
+
+    - **Parâmetros**:
+        - `raiz` (NoArvore): Nó raiz da árvore.
+
+    - **Retorno**:
+        - `NoArvore`: Árvore otimizada.
+    """
+
     if not raiz.operacao.startswith("π") and not raiz.operacao.startswith("σ"):
         return raiz
 
@@ -77,6 +116,15 @@ def otimizar_arvore(raiz: NoArvore) -> NoArvore:
 
 
 def gerar_imagem_arvore_otimizada(algebra_relacional: str) -> None:
+    """
+    Gera uma imagem da árvore de álgebra relacional otimizada.
+
+    - **Parâmetros**:
+        - `algebra_relacional` (str): Expressão de álgebra relacional a ser otimizada.
+
+    - **Retorno**:
+        - `None`
+    """
     arvore_processada: NoArvore = processar(algebra_relacional)
     arvore_otimizada: NoArvore = otimizar_arvore(arvore_processada)
     grafico: Digraph = desenhar_arvore(arvore_otimizada)
