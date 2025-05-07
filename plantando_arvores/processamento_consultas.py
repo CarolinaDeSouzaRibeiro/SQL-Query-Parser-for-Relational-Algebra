@@ -94,50 +94,77 @@ def processar(s: str) -> NoArvore:
     Returns:
         NoArvore: Raiz da árvore de operações.
     """
-    s = remover_parenteses_externos(''.join(s.strip().splitlines()))
+    # Track recursion depth for debug visualization
+    if not hasattr(processar, "recursion_level"):
+        processar.recursion_level = 0
+    indent = '  ' * processar.recursion_level
+    print(f"{indent}[DEBUG] processar called with: {s}")
+    processar.recursion_level += 1
+    try:
+        s = remover_parenteses_externos(''.join(s.strip().splitlines()))
 
-    # Projeção ou Seleção (forma: operador[param](argumento))
-    if s.startswith("𝝿[") or s.startswith("𝛔["):
-        operador = "π" if s.startswith("𝝿[") else "σ"
-        idx = s.index("](")
-        parametro = s[2:idx]
-        conteudo, _ = extrair_conteudo_parenteses(s, idx + 1)
-        no_sub = processar(conteudo)
+        # Function-call style join or product: ⨝(A, B) or X(A, B)
+        if (s.startswith("⨝(") or s.startswith("X(")) and s.endswith(")"):
+            op = '⨝' if s.startswith("⨝(") else 'X'
+            inner, _ = extrair_conteudo_parenteses(s, 1)
+            # Split top-level comma
+            nivel = 0
+            split_idx = None
+            for i, c in enumerate(inner):
+                if c == '(': nivel += 1
+                elif c == ')': nivel -= 1
+                elif c == ',' and nivel == 0:
+                    split_idx = i
+                    break
+            if split_idx is not None:
+                left = inner[:split_idx].strip()
+                right = inner[split_idx+1:].strip()
+                no = NoArvore(op)
+                no.adicionar_filho(processar(left))
+                no.adicionar_filho(processar(right))
+                return no
 
-        # Se for seleção, divide ∧ em múltiplos nós
-        if operador == "σ":
-            condicoes = quebrar_condicoes(parametro)
-            for cond in reversed(condicoes):
-                no = NoArvore(f"σ {cond.strip()}")
+        # Projeção ou Seleção (forma: operador[param](argumento))
+        if s.startswith("𝝿[") or s.startswith("𝛔["):
+            operador = "𝝿" if s.startswith("𝝿[") else "𝛔"
+            idx = s.index("](")
+            parametro = s[2:idx]
+            conteudo, _ = extrair_conteudo_parenteses(s, idx + 1)
+            no_sub = processar(conteudo)
+
+            # Se for seleção, divide ∧ em múltiplos nós
+            if operador == "𝛔":
+                condicoes = quebrar_condicoes(parametro)
+                for cond in reversed(condicoes):
+                    no = NoArvore(f"𝛔 {cond.strip()}")
+                    no.adicionar_filho(no_sub)
+                    no_sub = no
+                return no_sub
+            else:  # Projeção
+                no = NoArvore(f"𝝿 {parametro}")
                 no.adicionar_filho(no_sub)
-                no_sub = no
-            return no_sub
+                return no
 
-        else:  # Projeção
-            no = NoArvore(f"{operador} {parametro}")
-            no.adicionar_filho(no_sub)
-            return no
+        # Infix binary operators: ⨝ or X (Junção natural ou produto cartesiano)
+        nivel = 0
+        for i in range(len(s)):
+            if s[i] == '(': nivel += 1
+            elif s[i] == ')': nivel -= 1
+            elif nivel == 0 and (s[i] == '⨝' or s[i] == 'X'):
+                esquerda = s[:i]
+                direita = s[i+1:]
+                if s[i] == '⨝':
+                    no = NoArvore(f'⨝')
+                else:
+                    no = NoArvore(f'X')
+                no.adicionar_filho(processar(esquerda.strip()))
+                no.adicionar_filho(processar(direita.strip()))
+                return no
 
-    # Operadores binários: ⨝ ou X (Junção natural ou produto cartesiano)
-    nivel = 0
-    for i in range(len(s)):
-        if s[i] == '(':
-            nivel += 1
-        elif s[i] == ')':
-            nivel -= 1
-        elif nivel == 0 and (s[i] == '⨝' or s[i] == 'X'):
-            esquerda = s[:i]
-            direita = s[i+1:]
-            if s[i] == '⨝':
-                no = NoArvore(f'⨝')
-            else:
-                no = NoArvore(f'X')
-            no.adicionar_filho(processar(esquerda.strip()))
-            no.adicionar_filho(processar(direita.strip()))
-            return no
-
-    # Caso base: apenas uma tabela ou subexpressão entre colchetes
-    return NoArvore(s)
+        # Caso base: apenas uma tabela ou subexpressão entre colchetes
+        return NoArvore(s)
+    finally:
+        processar.recursion_level -= 1
 
 
 def desenhar_arvore(no: NoArvore) -> Digraph:

@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from plantando_arvores.otimizador import otimizar
 from plantando_arvores.arvore import NoArvore
+from plantando_arvores.processamento_consultas import processar
 
 # Configure logging
 logging.basicConfig(
@@ -90,6 +91,50 @@ class TestQueryOptimization(unittest.TestCase):
         except Exception as e:
             logger.error(f"Failed to optimize complex query plan: {str(e)}")
             raise
+
+    def test_simple_selection(self):
+        # Minimal working selection
+        ra = "𝛔[idade > 18](cliente[cliente])"
+        tree = processar(ra)
+        self.assertEqual(tree.operacao, "𝛔 idade > 18")
+        self.assertEqual(tree.filhos[0].operacao, "cliente[cliente]")
+
+    def test_simple_projection(self):
+        # Minimal working projection
+        ra = "𝝿[nome](cliente[cliente])"
+        tree = processar(ra)
+        self.assertEqual(tree.operacao, "𝝿 nome")
+        self.assertEqual(tree.filhos[0].operacao, "cliente[cliente]")
+
+    def test_selection_and_projection(self):
+        # Selection and projection
+        ra = "𝝿[nome](𝛔[idade > 18](cliente[cliente]))"
+        tree = processar(ra)
+        self.assertEqual(tree.operacao, "𝝿 nome")
+        self.assertEqual(tree.filhos[0].operacao, "𝛔 idade > 18")
+        self.assertEqual(tree.filhos[0].filhos[0].operacao, "cliente[cliente]")
+
+    def test_simple_join(self):
+        # Minimal working join
+        ra = "(cliente[cliente] ⨝ pedido[pedido])"
+        tree = processar(ra)
+        self.assertEqual(tree.operacao, "⨝")
+        self.assertEqual(tree.filhos[0].operacao, "cliente[cliente]")
+        self.assertEqual(tree.filhos[1].operacao, "pedido[pedido]")
+
+    def test_selection_on_join(self):
+        # Selection on join
+        ra = "𝛔[cliente.idcliente = pedido.cliente_idcliente]((cliente[cliente] ⨝ pedido[pedido]))"
+        tree = processar(ra)
+        self.assertEqual(tree.operacao, "𝛔 cliente.idcliente = pedido.cliente_idcliente")
+        self.assertEqual(tree.filhos[0].operacao, "⨝")
+
+    def test_projection_on_join(self):
+        # Projection on join
+        ra = "𝝿[cliente.nome, pedido.datapedido]((cliente[cliente] ⨝ pedido[pedido]))"
+        tree = processar(ra)
+        self.assertEqual(tree.operacao, "𝝿 cliente.nome, pedido.datapedido")
+        self.assertEqual(tree.filhos[0].operacao, "⨝")
 
 if __name__ == '__main__':
     unittest.main() 
