@@ -1,3 +1,7 @@
+"""
+Módulo responsável pelo parsing, validação e conversão de comandos SQL restritos para álgebra relacional.
+Implementa as regras do projeto de processador de consultas, incluindo validação de nomes, operadores e estrutura das consultas.
+"""
 #parse SQL based instructions
 #i. Select, From, Where, INNER JOIN;
 #ii. Operators =, >, <, <=, >=, <>, And, ( , ) ;
@@ -43,11 +47,17 @@ ALLOWED_CONNECTORS = {'AND'}
 
 # --- Funções Auxiliares ---
 def _normalize_name(name):
+    """
+    Normaliza um nome (tabela, coluna ou alias) para minúsculas e sem espaços.
+    """
     if not isinstance(name, str): return ""
     return name.lower().strip()
 
 # --- Funções de Validação e Reescrita ---
 def _validate_and_get_table_alias(table_name, alias, used_aliases, table_to_alias_map):
+    """
+    Valida o nome da tabela e do alias, garantindo unicidade e existência no esquema.
+    """
     norm_name = _normalize_name(table_name)
     if norm_name not in DATABASE_SCHEMA: raise ValueError(f"Erro de validação: Tabela '{table_name}' não encontrada no esquema.")
     alias_to_use = _normalize_name(alias) if alias else norm_name
@@ -57,6 +67,9 @@ def _validate_and_get_table_alias(table_name, alias, used_aliases, table_to_alia
     return norm_name, alias_to_use
 
 def _validate_column_name(col_name, involved_aliases_map):
+    """
+    Valida o nome da coluna, considerando alias e ambiguidades, conforme as tabelas envolvidas.
+    """
     col_name = col_name.strip()
     norm_col_name_full = _normalize_name(col_name)
     possible_matches = []
@@ -85,7 +98,9 @@ def _validate_column_name(col_name, involved_aliases_map):
         return possible_matches[0]
 
 def _rewrite_condition_part(part, involved_aliases_map, table_alias_details):
-    """Reescreve uma parte de condição para o formato AR (tudo minúsculo)."""
+    """
+    Reescreve uma parte de condição para o formato da álgebra relacional, validando colunas e operadores.
+    """
     part = part.strip()
     if not part: return ""
 
@@ -170,6 +185,9 @@ def _rewrite_condition_part(part, involved_aliases_map, table_alias_details):
 
 
 def _process_conditions(condition_str, involved_aliases_map, table_alias_details):
+    """
+    Processa e reescreve todas as condições de uma cláusula WHERE ou ON, retornando-as no formato da álgebra relacional.
+    """
     if not condition_str: return []
     parts = re.split(r'\s+AND\s+', condition_str, flags=re.IGNORECASE)
     rewritten_parts = []
@@ -184,6 +202,9 @@ def _process_conditions(condition_str, involved_aliases_map, table_alias_details
 
 # --- Função Principal de Parsing e Validação ---
 def parse_validate_sql(sql_query):
+    """
+    Realiza o parsing e validação de uma consulta SQL restrita, retornando a estrutura parseada.
+    """
     query = sql_query.strip()
     if not query: raise ValueError("Consulta SQL não pode ser vazia.")
     select_match = re.match(r"SELECT\s+(.*?)\s+(FROM\s+.*)", query, re.IGNORECASE | re.DOTALL)
@@ -257,7 +278,9 @@ def parse_validate_sql(sql_query):
 
 # --- Função de Conversão para Álgebra Relacional ---
 def convert_to_relational_algebra(parsed_data):
-    """Converte estrutura parseada para Álgebra Relacional (tudo minúsculo)."""
+    """
+    Converte a estrutura parseada para uma expressão de álgebra relacional.
+    """
     details = parsed_data['table_alias_details']
     from_table_info = parsed_data['from_table']
     from_table_norm = from_table_info['name']
@@ -304,7 +327,9 @@ def convert_to_relational_algebra(parsed_data):
 
 # --- Função Principal de Processamento ---
 def process_sql_query(sql_query):
-    """Processa consulta SQL: parseia, valida e converte para AR."""
+    """
+    Função principal para processar uma consulta SQL: faz o parsing, valida e converte para álgebra relacional.
+    """
     try:
         parsed_data = parse_validate_sql(sql_query)
         relational_algebra = convert_to_relational_algebra(parsed_data)
@@ -312,13 +337,11 @@ def process_sql_query(sql_query):
     except ValueError as e:
         print(f"Erro: {e}")
         return e
-        # return None
     except Exception as e:
         print(f"Erro inesperado no processamento: {e}")
         import traceback
         traceback.print_exc()
         return e
-        # return None
 
 # --- Bloco Principal para Testes ---
 if __name__ == "__main__":

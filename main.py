@@ -1,9 +1,17 @@
+"""
+Interface gráfica para o processador de consultas SQL do projeto de Banco de Dados.
+Permite inserir comandos SQL, visualizar a álgebra relacional correspondente e as árvores de operadores (antes e depois da otimização).
+"""
 import gradio as gr
 import graphviz as gv
 from arvores_construcao_otimizacao import gerar_imagem_arvore_processada, gerar_grafo_otimizado
 from parser import process_sql_query
 
 def funcao_btn(comando):
+    """
+    Função chamada ao submeter um comando SQL na interface.
+    Realiza o processamento do SQL, gera a álgebra relacional e as imagens das árvores (não-otimizada e otimizada).
+    """
     #CHECAGEM DA VALIDADE DO COMANDO SQL
     try:
         algebra_relacional = process_sql_query(comando)
@@ -30,6 +38,9 @@ def funcao_btn(comando):
     return algebra_relacional, 'img/arvore_consulta_processada.png', 'img/arvore_consulta_otimizada.png'
 
 with gr.Blocks() as demo:
+    """
+    Monta a interface gráfica do sistema, com campos para entrada de SQL, exibição da álgebra relacional e das imagens das árvores.
+    """
     gr.Markdown("## Processador de consultas")
     with gr.Row():
         with gr.Column():

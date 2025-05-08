@@ -1,16 +1,19 @@
 # ProcConsultas
 
-## Descrição
+## Introdução
 
-Este repositório contém um conjunto de scripts em Python para gerenciamento de um banco de dados de vendas, geração de dados sintéticos, processamento de consultas SQL e visualização de árvores de álgebra relacional. O objetivo principal é fornecer uma ferramenta para testes de performance, simulações de carga e desenvolvimento de aplicações com banco de dados SQLite.
+Este projeto foi desenvolvido como parte da disciplina de Banco de Dados, atendendo ao desafio proposto pelo professor: implementar um processador de consultas SQL capaz de analisar, validar, otimizar e visualizar consultas sobre um banco de dados relacional de vendas. O sistema realiza o parsing de comandos SQL restritos, converte-os para álgebra relacional, constrói a árvore de operadores correspondente, aplica heurísticas de otimização (como pushdown de seleções e projeções) e gera visualizações gráficas das árvores antes e depois da otimização. O objetivo é demonstrar, de forma prática e visual, o funcionamento interno de um processador de consultas, conforme os requisitos do projeto 2 da disciplina.
 
 ## Índice
 
-- [Instalação](#instalação)
-- [Uso](#uso)
-- [Estrutura do Diretório](#estrutura-do-diretório)
-- [Contribuindo](#contribuindo)
-- [Licença](#licença)
+- [ProcConsultas](#procconsultas)
+  - [Introdução](#introdução)
+  - [Índice](#índice)
+  - [Instalação](#instalação)
+  - [Uso](#uso)
+  - [Estrutura do Diretório](#estrutura-do-diretório)
+  - [Contribuindo](#contribuindo)
+  - [Licença](#licença)
 
 ## Instalação
 

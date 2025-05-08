@@ -1,3 +1,7 @@
+"""
+Módulo de construção, otimização e visualização de árvores de álgebra relacional.
+Implementa as estruturas de dados, algoritmos de parsing, heurísticas de otimização e geração de imagens das árvores para o processador de consultas do projeto.
+"""
 from __future__ import annotations
 from typing import Optional, Literal
 from graphviz import Digraph
