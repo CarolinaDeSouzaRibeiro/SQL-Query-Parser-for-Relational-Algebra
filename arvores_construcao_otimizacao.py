@@ -1,8 +1,67 @@
+"""
+# Módulo de Álgebra Relacional para Otimização de Consultas
+
+Este módulo implementa um conjunto de ferramentas para converter expressões de álgebra relacional em árvores de operações
+e realizar otimizações sobre essas árvores. Ele é útil para sistemas de gerenciamento de banco de dados, otimizadores de 
+consultas e ferramentas educacionais relacionadas a banco de dados.
+
+## Principais Funcionalidades
+
+- Conversão de expressões de álgebra relacional em árvores binárias
+- Otimização de árvores através do reposicionamento de operações de seleção
+- Otimização de árvores através da introdução de projeções precoces
+- Geração de representações visuais das árvores usando Graphviz
+
+## Classes Principais
+
+- `No`: Representa um nó na árvore de álgebra relacional
+- `Arvore`: Representa uma árvore completa de álgebra relacional
+
+## Operações Suportadas
+
+- PROJECT (π): Projeção de atributos
+- SELECT (σ): Seleção de tuplas baseada em condições
+- JOIN (⨝): Junção natural ou junção com condição
+- PRODUCT (⨝): Produto cartesiano
+- TABLE: Declaração de tabela base
+
+## Otimizações Implementadas
+
+1. **Otimização de Seleções**: Move operações de seleção para mais próximo das tabelas
+   base sempre que possível, reduzindo o volume de dados a serem processados nas operações
+   subsequentes.
+
+2. **Otimização de Projeções**: Introduz projeções logo após as operações de tabela base
+   para reduzir o número de atributos transportados entre as operações, diminuindo o custo
+   de processamento e transferência de dados.
+
+## Exemplo de Uso
+
+```python
+# Expressão de álgebra relacional
+algebra = "𝝿[cliente.nome, pedido.datapedido](𝛔[cliente.idcliente = pedido.cliente_idcliente]((cliente[cliente] ⨝ pedido[pedido])))"
+
+# Converter para árvore
+arvore = converter_algebra_em_arvore(algebra)
+
+# Otimizar a árvore
+arvore_otimizada = otimizar_selects(arvore)
+arvore_otimizada = otimizar_projecoes(arvore_otimizada)
+
+# Gerar visualização
+desenhar_arvore(arvore, "arvore_original")
+desenhar_arvore(arvore_otimizada, "arvore_otimizada")
+"""
+
 from __future__ import annotations
 from typing import Optional, Literal
 from graphviz import Digraph
 from copy import deepcopy
 from pathlib import Path
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ###
+## DECLARAÇÃO DAS CLASSES QUE COMPÕE A ÁRVORE ##
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ###
 
 class No:
     def __init__(
@@ -71,6 +130,10 @@ class No:
 class Arvore:
     def __init__(self: Arvore) -> None:
         self.raiz = None
+        
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ####
+## PROCESSAMENTO DE UMA ÁLGEBRA RELACIONAL PARA UMA ÁRVORE BINÁRIA DE CONSULTAS ##
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ####
         
 def remover_espacamentos_e_quebras_de_linhas(
     expressao: str,
@@ -313,6 +376,10 @@ def identificar_operandos_complexos(expr: str) -> tuple[str, str]:
     
     raise ValueError(f"Não foi possível identificar os operandos em: {expr}")
 
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ###
+## GERANDO A IMAGEM DA ÁRVORE DE CONSULTAS ##
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ###
+
 def desenhar_arvore(arvore: Arvore, nome_arquivo: str, nome_subpasta: Optional[str] = None) -> None:
     if arvore.raiz is None:
         raise ValueError("A árvore está vazia. Não é possível desenhar.")
@@ -344,6 +411,10 @@ def desenhar_arvore(arvore: Arvore, nome_arquivo: str, nome_subpasta: Optional[s
     adicionar_nos(dot, arvore.raiz)
     dot.render(filename=str(caminho_arquivo), cleanup=True)
     print(f"Árvore salva como {caminho_arquivo.with_suffix('.png')}")
+    
+## ## ## ## ## ## ## ## ## ## ## ## ####
+## OTIMIZAÇÃO DAS OPERAÇÕES DE SELECT ##
+## ## ## ## ## ## ## ## ## ## ## ## ####
 
 def otimizar_selects(arvore_nao_otimizada: Arvore) -> Arvore:
     """
@@ -685,6 +756,10 @@ def atualizar_niveis_recursivamente(no: No, nivel: int) -> None:
     atualizar_niveis_recursivamente(no.filho_esq, nivel + 1)
     atualizar_niveis_recursivamente(no.filho_dir, nivel + 1)
 
+## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## OTIMIZAÇÃO DAS OPERAÇÕES DE PROJECT ##
+## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
 def otimizar_projecoes(arvore_nao_otimizada: Arvore) -> Arvore:
     """
     Otimiza a árvore de álgebra relacional adicionando uma projeção logo imediatamente 
@@ -882,6 +957,10 @@ def inserir_projecoes_precoces(no: No, colunas_necessarias: dict[str, set[str]])
     # Se não houve modificação, retorna o nó original
     return no
 
+## ## ## ## ## ## ##
+## CASOS DE TESTE ##
+## ## ## ## ## ## ##
+
 test_cases = [
     # (Somente os testes com `expected_ra`, removi os que esperam erro)
     {"description": "T1", "expected_ra": "𝝿[cliente.nome, cliente.email](cliente[cliente])"},
@@ -903,6 +982,10 @@ test_cases = [
     {"description": "E10b", "expected_ra": "𝝿[p.nome](𝛔[c.idcategoria = c.idcategoria]((produto[p] ⨝ categoria[c])))"},
     {"description": "E10c", "expected_ra": "𝝿[p.nome](𝛔[c.idcategoria = c.idcategoria]((produto[p] ⨝ categoria[c])))"},
 ]
+
+## ## ## ## ## ## ## ###
+## GERAÇÃO DE IMAGENS ##
+## ## ## ## ## ## ## ###
 
 def gerar_imagens(algebra: str, nome_arquivo: str) -> None:
     """
@@ -928,13 +1011,6 @@ def gerar_imagens(algebra: str, nome_arquivo: str) -> None:
         print(f"❌ Falha ao processar {descricao}: {e}")
     else:
         print(f"✅ Árvore gerada para {descricao} e salva como '{nome_arquivo}.png'")
-    
-if __name__ == "__main__":
-    for i, teste in enumerate(test_cases, start=1):
-        descricao = teste["description"]
-        algebra = teste["expected_ra"]
-        print(f"\n🧪 Testando {descricao}...")
-        gerar_imagens(algebra, f"arvore_{descricao.lower()}")
 
 def gerar_imagem_arvore_processada(algebra_relacional: str):
     """
@@ -957,3 +1033,15 @@ def gerar_grafo_otimizado(algebra_relacional: str):
     arvore_otimizada = otimizar_projecoes(arvore_otimizada)
     # Salva como 'img/arvore_consulta_otimizada.png'
     desenhar_arvore(arvore_otimizada, "arvore_consulta_otimizada", nome_subpasta=None)
+
+
+## ## ## ## ## ## ## ##
+## TESTANDO O MÓDULO ##
+## ## ## ## ## ## ## ##
+
+if __name__ == "__main__":
+    for i, teste in enumerate(test_cases, start=1):
+        descricao = teste["description"]
+        algebra = teste["expected_ra"]
+        print(f"\n🧪 Testando {descricao}...")
+        gerar_imagens(algebra, f"arvore_{descricao.lower()}")
