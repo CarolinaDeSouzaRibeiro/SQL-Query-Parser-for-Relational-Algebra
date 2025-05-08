@@ -59,8 +59,6 @@ with gr.Blocks() as demo:
                 with gr.Column():
                     gr.Markdown("Grafo otimizado")
                     grafo_otim = gr.Image(label="Otimizado")
-            # grafo = gr.Image(label="Não-Otimizado")
-            # grafo_otim = gr.Image(label="Otimizado")
 
         #comando do botao
         btn.click(funcao_btn, inputs=[cmd_sql], outputs=[algeb_relac, grafo, grafo_otim])

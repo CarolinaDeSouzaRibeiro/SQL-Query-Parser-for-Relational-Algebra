@@ -398,7 +398,10 @@ def desenhar_arvore(arvore: Arvore, nome_arquivo: str, nome_subpasta: Optional[s
     dot = Digraph(comment="Árvore de Álgebra Relacional", format="png")
     
     def adicionar_nos(dot: Digraph, no: No):
-        dot.node(str(id(no)), label=no.valor.replace("𝝿", "π").replace("𝛔", "σ").replace("⨝", "X"))
+        dot.attr('graph',fontname='Cambria Math')
+        dot.attr('node',fontname='Cambria Math')
+
+        dot.node(str(id(no)), label=no.valor.replace("𝝿", "π").replace("𝛔", "σ").replace("⨝", "⨝"))
         
         if no.filho_esq:
             dot.edge(str(id(no)), str(id(no.filho_esq)))
